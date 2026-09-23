@@ -30,9 +30,15 @@ function formatPrice(price) {
     var p = Number(price);
     if (p < 1) {
         var truncated = Math.floor(p * 100) / 100;
-        return "$" + truncated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return "$" + truncated.toFixed(2);
     }
-    return "$" + Math.floor(p).toLocaleString(undefined);
+    var digits = String(Math.floor(p));
+    var grouped = "";
+    while (digits.length > 3) {
+        grouped = "," + digits.substring(digits.length - 3) + grouped;
+        digits = digits.substring(0, digits.length - 3);
+    }
+    return "$" + digits + grouped;
 }
 
 function symbolColor(symbol) {

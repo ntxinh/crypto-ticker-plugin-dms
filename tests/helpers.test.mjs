@@ -32,6 +32,7 @@ test("formatPrice preserves original rules", () => {
     assert.equal(T.formatPrice(0.456), "$0.45");        // <1: truncate, not round
     assert.equal(T.formatPrice(null), "unknown");
     assert.equal(T.formatPrice(undefined), "unknown");
+    assert.equal(T.formatPrice(0.4), "$0.40");          // <1: trailing zero kept
 });
 
 test("symbolColor map + default", () => {
