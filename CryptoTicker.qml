@@ -9,7 +9,8 @@ PluginComponent {
     id: root
 
     // Settings (pluginData auto-reloads on pluginDataChanged)
-    property var coins: Ticker.parseCoins(pluginData.coins || "bitcoin,ethereum,tether")
+    property string coinsCsv: pluginData.coins || "bitcoin,ethereum,tether"
+    property var coins: Ticker.parseCoins(coinsCsv)
     property string currency: pluginData.currency || "usd"
     property int refreshInterval: Math.max(5, pluginData.refreshInterval || 300)
     property int tickerWidth: pluginData.tickerWidth || 280
@@ -47,7 +48,7 @@ PluginComponent {
         requestFetch(false);
     }
 
-    onCoinsChanged: requestFetch(true)
+    onCoinsCsvChanged: requestFetch(true)
     onCurrencyChanged: requestFetch(true)
 
     function requestFetch(force) {
@@ -105,7 +106,7 @@ PluginComponent {
         Item {
             id: pill
             implicitWidth: root.tickerWidth
-            implicitHeight: tickerRow.implicitHeight
+            implicitHeight: Math.max(tickerRow.implicitHeight, statusText.implicitHeight)
             clip: true
 
             Row {
@@ -144,6 +145,7 @@ PluginComponent {
             }
 
             StyledText {
+                id: statusText
                 anchors.centerIn: parent
                 visible: !root.hasData
                 text: root.lastError ? "crypto: " + root.lastError : "crypto: …"
@@ -170,6 +172,7 @@ PluginComponent {
         Column {
             spacing: Theme.spacingXS
             Repeater {
+                visible: root.hasData
                 model: root.segments
                 Column {
                     StyledText {
