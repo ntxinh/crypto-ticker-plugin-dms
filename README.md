@@ -4,15 +4,11 @@ A DankMaterialShell (DMS) bar widget that shows live cryptocurrency prices from
 the CoinGecko public API. Ported from the GNOME Shell extension
 `crypto-ticker@ntxinh`.
 
-## Screenshots
+## Screenshot
 
-The ticker pill in the DankBar (right section), marquee mid-scroll:
+The ticker pill in the DankBar (right section), marquee scrolling:
 
-![CryptoTicker in the DankBar](assets/ticker.png)
-
-Full desktop context:
-
-![Full desktop with CryptoTicker](assets/bar-full.png)
+![CryptoTicker scrolling in the DankBar](assets/ticker.gif)
 
 ## Features
 
