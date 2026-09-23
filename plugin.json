@@ -1,0 +1,15 @@
+{
+    "id": "cryptoTicker",
+    "name": "Crypto Ticker",
+    "description": "Scrolling cryptocurrency prices in the bar, powered by CoinGecko",
+    "version": "1.0.0",
+    "author": "ntxinh (DMS port)",
+    "type": "widget",
+    "capabilities": ["dankbar-widget"],
+    "component": "./CryptoTicker.qml",
+    "settings": "./CryptoTickerSettings.qml",
+    "icon": "currency_bitcoin",
+    "requires_dms": ">=1.4.0",
+    "requires": ["curl"],
+    "permissions": ["settings_read", "settings_write"]
+}
