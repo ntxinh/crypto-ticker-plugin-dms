@@ -106,7 +106,7 @@ function parseResponse(stdout, exitCode) {
     if (isNaN(status))
         return { ok: false, status: 0, error: "Invalid response" };
     if (status !== 200)
-        return { ok: false, status: status, error: "HTTP " + status };
+        return { ok: false, status: status, error: "HTTP " + status, bodySnippet: body.trim().substring(0, 200) };
     try {
         var data = JSON.parse(body);
         if (!Array.isArray(data))

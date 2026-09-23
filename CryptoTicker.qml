@@ -28,7 +28,7 @@ PluginComponent {
     property string lastError: ""
 
     readonly property var segments: Ticker.buildSegments(coins, marketData, changeColors)
-    readonly property bool hasData: marketData && marketData.length > 0
+    readonly property bool hasData: marketData && marketData.length > 0 && coins.length > 0
 
     function syncGlobals() {
         marketData = PluginService.getGlobalVar("cryptoTicker", "marketData", []);
@@ -45,11 +45,21 @@ PluginComponent {
 
     Component.onCompleted: {
         syncGlobals();
-        requestFetch(false);
+        // Defer: WidgetHost assigns pluginId/pluginService in Loader.onLoaded,
+        // which runs after onCompleted; pluginData settings are settled by then.
+        Qt.callLater(function() { requestFetch(false); });
+    }
+
+    Component.onDestruction: {
+        // A fetcher dying mid-fetch leaves the shared flag stale; clear it.
+        if (ownsFetch)
+            PluginService.setGlobalVar("cryptoTicker", "fetching", false);
     }
 
     onCoinsCsvChanged: requestFetch(true)
     onCurrencyChanged: requestFetch(true)
+
+    property bool ownsFetch: false
 
     function requestFetch(force) {
         if (!coins.length) {
@@ -57,8 +67,14 @@ PluginComponent {
             return;
         }
         const now = Date.now();
-        if (PluginService.getGlobalVar("cryptoTicker", "fetching", false))
+        const fetchingSince = PluginService.getGlobalVar("cryptoTicker", "fetchingSince", 0);
+        const fetching = PluginService.getGlobalVar("cryptoTicker", "fetching", false)
+            && now - fetchingSince <= 15000;
+        if (fetching) {
+            if (force)
+                PluginService.setGlobalVar("cryptoTicker", "pendingForce", true);
             return;
+        }
         if (!force) {
             const lastTs = PluginService.getGlobalVar("cryptoTicker", "lastFetchTs", 0);
             const backoffUntil = PluginService.getGlobalVar("cryptoTicker", "backoffUntil", 0);
@@ -67,11 +83,14 @@ PluginComponent {
             if (now < backoffUntil)
                 return;
         }
+        ownsFetch = true;
+        PluginService.setGlobalVar("cryptoTicker", "fetchingSince", now);
         PluginService.setGlobalVar("cryptoTicker", "fetching", true);
         Proc.runCommand("cryptoTicker.fetch", ["curl", "-sS", "--connect-timeout", "3", "--max-time", "8", "--compressed", "-w", "\n%{http_code}", Ticker.buildUrl(coins, currency)], (stdout, exitCode) => onFetchDone(stdout, exitCode), 100);
     }
 
     function onFetchDone(stdout, exitCode) {
+        ownsFetch = false;
         PluginService.setGlobalVar("cryptoTicker", "fetching", false);
         const res = Ticker.parseResponse(stdout, exitCode);
         if (res.ok) {
@@ -79,17 +98,23 @@ PluginComponent {
             PluginService.setGlobalVar("cryptoTicker", "lastFetchTs", Date.now());
             PluginService.setGlobalVar("cryptoTicker", "failCount", 0);
             PluginService.setGlobalVar("cryptoTicker", "lastError", "");
-            return;
+        } else {
+            console.warn("CryptoTicker: " + res.error + (res.bodySnippet ? " | body: " + res.bodySnippet : ""));
+            if (res.status === 429) {
+                const n = PluginService.getGlobalVar("cryptoTicker", "failCount", 0) + 1;
+                PluginService.setGlobalVar("cryptoTicker", "failCount", n);
+                const backoff = Math.min(Math.pow(2, n) * refreshInterval * 1000, 900000);
+                PluginService.setGlobalVar("cryptoTicker", "backoffUntil", Date.now() + backoff);
+            }
+            // Keep marketData: last-known prices stay visible.
+            PluginService.setGlobalVar("cryptoTicker", "lastError", res.error);
         }
-        console.warn("CryptoTicker: " + res.error);
-        if (res.status === 429) {
-            const n = PluginService.getGlobalVar("cryptoTicker", "failCount", 0) + 1;
-            PluginService.setGlobalVar("cryptoTicker", "failCount", n);
-            const backoff = Math.min(Math.pow(2, n) * refreshInterval * 1000, 900000);
-            PluginService.setGlobalVar("cryptoTicker", "backoffUntil", Date.now() + backoff);
+        // A forced fetch dropped by the fetching gate is replayed now that
+        // settings have settled.
+        if (PluginService.getGlobalVar("cryptoTicker", "pendingForce", false)) {
+            PluginService.setGlobalVar("cryptoTicker", "pendingForce", false);
+            requestFetch(true);
         }
-        // Keep marketData: last-known prices stay visible.
-        PluginService.setGlobalVar("cryptoTicker", "lastError", res.error);
     }
 
     Timer {
@@ -161,15 +186,16 @@ PluginComponent {
                 to: -tickerRow.implicitWidth
                 duration: Math.max(1, (pill.implicitWidth + tickerRow.implicitWidth) / 60 * 1000)
                 loops: Animation.Infinite
-                running: root.marqueeEnabled && root.hasData && tickerRow.implicitWidth > pill.implicitWidth + 10
-                onRunningChanged: if (!running)
-                    tickerRow.x = 0
+            running: root.marqueeEnabled && root.hasData && tickerRow.implicitWidth > pill.implicitWidth + 10
+            onRunningChanged: if (!running)
+                tickerRow.x = 0
             }
         }
     }
 
     verticalBarPill: Component {
         Column {
+            clip: true
             spacing: Theme.spacingXS
             Repeater {
                 visible: root.hasData

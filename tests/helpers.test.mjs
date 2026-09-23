@@ -80,3 +80,12 @@ test("parseResponse handles success, errors, and malformed output", () => {
     assert.equal(T.parseResponse("garbage-no-status-line", 0).ok, false);              // missing status
     assert.equal(T.parseResponse("not json\n200", 0).ok, false);                       // bad JSON
 });
+
+test("parseResponse includes truncated bodySnippet on HTTP errors", () => {
+    const res = T.parseResponse('{"error":"x"}\n400', 0);
+    assert.equal(res.ok, false);
+    assert.equal(res.status, 400);
+    assert.equal(res.bodySnippet, '{"error":"x"}');
+    const long = "e".repeat(500) + "\n500";
+    assert.equal(T.parseResponse(long, 0).bodySnippet.length, 200);
+});
